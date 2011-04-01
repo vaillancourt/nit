@@ -1207,11 +1207,8 @@ class Lexer
 	# Lexer current state
 	var _state: Int = 0
 
-	# Name of the stream (as given to tokens)
-	readable var _filename: String
-
-	# Input stream where character are read
-	var _stream: IStream
+	# The stream
+	readable var _file: SourceFile
 
 	# Pushback buffer to store unread character
 	var _stream_buf: Buffer
@@ -1238,11 +1235,10 @@ class Lexer
 	private fun state_initial: Int do return 0 end
 
 	# Create a new lexer for a stream (and a name)
-	init(stream: IStream, fname: String)
+	init(file: SourceFile)
 	do
-		_filename = fname
+		_file = file
 		_text = new Buffer
-		_stream = stream
 		_stream_pos = -1
 		_stream_buf = new Buffer
 	end
@@ -1356,7 +1352,7 @@ class Lexer
 				end
 			else
 				if accept_state != -1 then
-					var location = new Location(_filename, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
+					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
 					push_back(accept_length)
@@ -1645,7 +1641,7 @@ class Lexer
 						return new TEndString.init_tk(token_text, location)
 					end
 				else
-					var location = new Location(_filename, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
+					var location = new Location(_file, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
 					if text.length > 0 then
 						var token = new AError.init_error("Syntax error: unknown token {text}.", location)
 						return token
@@ -1674,7 +1670,7 @@ class Lexer
 			_stream_pos = sp - 1
 			result = res.ascii
 		else
-			result = _stream.read_char
+			result = _file.stream.read_char
 		end
 
 		if result == -1 then

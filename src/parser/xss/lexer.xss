@@ -27,11 +27,8 @@ class Lexer
 	# Lexer current state
 	var _state: Int = 0
 
-	# Name of the stream (as given to tokens)
-	readable var _filename: String
-
-	# Input stream where character are read
-	var _stream: IStream
+	# The stream
+	readable var _file: SourceFile
 
 	# Pushback buffer to store unread character
 	var _stream_buf: Buffer
@@ -60,11 +57,10 @@ $ foreach {lexer_data/state}
 $ end foreach
 
 	# Create a new lexer for a stream (and a name)
-	init(stream: IStream, fname: String)
+	init(file: SourceFile)
 	do
-		_filename = fname
+		_file = file
 		_text = new Buffer
-		_stream = stream
 		_stream_pos = -1
 		_stream_buf = new Buffer
 	end
@@ -178,7 +174,7 @@ $ end foreach
 				end
 			else
 				if accept_state != -1 then
-					var location = new Location(_filename, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
+					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
 					push_back(accept_length)
@@ -205,7 +201,7 @@ $    end
 					end
 $ end foreach
 				else
-					var location = new Location(_filename, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
+					var location = new Location(_file, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
 					if text.length > 0 then
 						var token = new PError.init_error("Syntax error: unknown token {text}.", location)
 						return token
@@ -234,7 +230,7 @@ $ end foreach
 			_stream_pos = sp - 1
 			result = res.ascii
 		else
-			result = _stream.read_char
+			result = _file.stream.read_char
 		end
 
 		if result == -1 then
