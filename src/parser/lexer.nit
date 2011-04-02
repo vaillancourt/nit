@@ -1210,11 +1210,8 @@ class Lexer
 	# The stream
 	readable var _file: SourceFile
 
-	# Pushback buffer to store unread character
-	var _stream_buf: Buffer
-
-	# Number of character stored in the pushback buffer
-	var _stream_pos: Int
+	# Current character in the stream
+	var _stream_pos: Int = 0
 
 	# Current line number in the input stream
 	var _line: Int = 0
@@ -1224,9 +1221,6 @@ class Lexer
 
 	# Was the last character a cariage-return?
 	var _cr: Bool = false
-
-	# If the end of stream?
-	var _eof: Bool = false
 
 	# Current working text read from the input stream
 	var _text: Buffer
@@ -1239,8 +1233,6 @@ class Lexer
 	do
 		_file = file
 		_text = new Buffer
-		_stream_pos = -1
-		_stream_buf = new Buffer
 	end
 
 	# Give the next token (but do not consume it)
@@ -1355,7 +1347,7 @@ class Lexer
 					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
-					push_back(accept_length)
+					push_back(text.length - accept_length)
 					if accept_token == 0 then
 						return null
 					end
@@ -1658,40 +1650,20 @@ class Lexer
 	# The character is read from the stream of from the pushback buffer.
 	private fun get_char: Int
 	do
-		if _eof then
+		var sp = _stream_pos
+		if sp >= _file.string.length then
 			return -1
 		end
-
-		var result: Int
-
-		var sp = _stream_pos
-		if sp >= 0 then
-			var res = _stream_buf[_stream_pos]
-			_stream_pos = sp - 1
-			result = res.ascii
-		else
-			result = _file.stream.read_char
-		end
-
-		if result == -1 then
-			_eof = true
-		end
-
-		return result
+		var res = _file.string[_stream_pos]
+		_stream_pos += 1
+		return res.ascii
 	end
 
 	# Unread some characters.
 	# Unread characters are stored in the pushback buffer.
-	private fun push_back(accept_length: Int)
+	private fun push_back(length: Int)
 	do
-		var length = _text.length
-		var i = length - 1
-		while i >= accept_length do
-			_eof = false
-			_stream_pos = _stream_pos + 1
-			_stream_buf[_stream_pos] = _text[i]
-			i = i - 1
-		end
+		_stream_pos -= length
 	end
 end
 

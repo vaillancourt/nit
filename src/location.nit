@@ -18,7 +18,12 @@ package location
 
 class SourceFile
 	var filename: String
-	var stream: IStream
+	var string: String
+	init(f:String, s:IStream)
+	do
+		filename = f
+		string = s.read_all
+	end
 end
 
 class Location
