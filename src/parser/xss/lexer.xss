@@ -42,9 +42,6 @@ class Lexer
 	# Was the last character a cariage-return?
 	var _cr: Bool = false
 
-	# Current working text read from the input stream
-	var _text: Buffer
-
 $ foreach {lexer_data/state}
 	# Constante state values
 	private fun state_${translate(@name,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")}: Int do return @id end
@@ -54,7 +51,6 @@ $ end foreach
 	init(file: SourceFile)
 	do
 		_file = file
-		_text = new Buffer
 	end
 
 	# Give the next token (but do not consume it)
@@ -82,6 +78,7 @@ $ end foreach
 	do
 		var dfa_state = 0
 
+		var start_stream_pos = _stream_pos
 		var start_pos = _pos
 		var start_line = _line
 
@@ -90,9 +87,6 @@ $ end foreach
 		var accept_length = -1
 		var accept_pos = -1
 		var accept_line = -1
-
-		var text = _text
-		text.clear
 
 		loop
 			var c = get_char
@@ -116,8 +110,6 @@ $ end foreach
 					pos = pos + 1
 					cr = false
 				end
-
-				text.add(c.ascii)
 
 				loop
 					var old_state = dfa_state
@@ -160,7 +152,7 @@ $ end foreach
 				if tok != -1 then
 					accept_state = dfa_state
 					accept_token = tok
-					accept_length = text.length
+					accept_length = _stream_pos - start_stream_pos
 					accept_pos = _pos
 					accept_line = _line
 				end
@@ -169,7 +161,7 @@ $ end foreach
 					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
-					push_back(text.length - accept_length)
+					push_back(_stream_pos - start_stream_pos - accept_length)
 $ foreach {//token}
 					if accept_token == ${position()-1} then
 $    if {count(transition[@from!=@to])!=0}
@@ -182,7 +174,7 @@ $        end
 $    end if
 $    if {@parser_index}
 $        if {not(@text)}
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new @ename.init_tk(token_text, location)
 $        else
 						return new @ename.init_tk(location)
@@ -194,7 +186,8 @@ $    end
 $ end foreach
 				else
 					var location = new Location(_file, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
-					if text.length > 0 then
+					if _stream_pos > start_stream_pos then
+						var text = _file.string.substring(start_stream_pos, _stream_pos)
 						var token = new PError.init_error("Syntax error: unknown token {text}.", location)
 						return token
 					else

@@ -1222,9 +1222,6 @@ class Lexer
 	# Was the last character a cariage-return?
 	var _cr: Bool = false
 
-	# Current working text read from the input stream
-	var _text: Buffer
-
 	# Constante state values
 	private fun state_initial: Int do return 0 end
 
@@ -1232,7 +1229,6 @@ class Lexer
 	init(file: SourceFile)
 	do
 		_file = file
-		_text = new Buffer
 	end
 
 	# Give the next token (but do not consume it)
@@ -1260,6 +1256,7 @@ class Lexer
 	do
 		var dfa_state = 0
 
+		var start_stream_pos = _stream_pos
 		var start_pos = _pos
 		var start_line = _line
 
@@ -1268,9 +1265,6 @@ class Lexer
 		var accept_length = -1
 		var accept_pos = -1
 		var accept_line = -1
-
-		var text = _text
-		text.clear
 
 		loop
 			var c = get_char
@@ -1294,8 +1288,6 @@ class Lexer
 					pos = pos + 1
 					cr = false
 				end
-
-				text.add(c.ascii)
 
 				loop
 					var old_state = dfa_state
@@ -1338,7 +1330,7 @@ class Lexer
 				if tok != -1 then
 					accept_state = dfa_state
 					accept_token = tok
-					accept_length = text.length
+					accept_length = _stream_pos - start_stream_pos
 					accept_pos = _pos
 					accept_line = _line
 				end
@@ -1347,20 +1339,20 @@ class Lexer
 					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
-					push_back(text.length - accept_length)
+					push_back(_stream_pos - start_stream_pos - accept_length)
 					if accept_token == 0 then
 						return null
 					end
 					if accept_token == 1 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TEol.init_tk(token_text, location)
 					end
 					if accept_token == 2 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TComment.init_tk(token_text, location)
 					end
 					if accept_token == 3 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TKwmodule.init_tk(token_text, location)
 					end
 					if accept_token == 4 then
@@ -1376,7 +1368,7 @@ class Lexer
 						return new TKwinterface.init_tk(location)
 					end
 					if accept_token == 8 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TKwenum.init_tk(token_text, location)
 					end
 					if accept_token == 9 then
@@ -1593,48 +1585,49 @@ class Lexer
 						return new TBang.init_tk(location)
 					end
 					if accept_token == 80 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TClassid.init_tk(token_text, location)
 					end
 					if accept_token == 81 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TId.init_tk(token_text, location)
 					end
 					if accept_token == 82 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TAttrid.init_tk(token_text, location)
 					end
 					if accept_token == 83 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TNumber.init_tk(token_text, location)
 					end
 					if accept_token == 84 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TFloat.init_tk(token_text, location)
 					end
 					if accept_token == 85 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TChar.init_tk(token_text, location)
 					end
 					if accept_token == 86 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TString.init_tk(token_text, location)
 					end
 					if accept_token == 87 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TStartString.init_tk(token_text, location)
 					end
 					if accept_token == 88 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TMidString.init_tk(token_text, location)
 					end
 					if accept_token == 89 then
-						var token_text = text.substring(0, accept_length)
+						var token_text = _file.string.substring(start_stream_pos, accept_length)
 						return new TEndString.init_tk(token_text, location)
 					end
 				else
 					var location = new Location(_file, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
-					if text.length > 0 then
+					if _stream_pos > start_stream_pos then
+						var text = _file.string.substring(start_stream_pos, _stream_pos)
 						var token = new AError.init_error("Syntax error: unknown token {text}.", location)
 						return token
 					else
