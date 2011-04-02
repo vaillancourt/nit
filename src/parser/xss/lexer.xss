@@ -78,9 +78,12 @@ $ end foreach
 	do
 		var dfa_state = 0
 
-		var start_stream_pos = _stream_pos
+		var sp = _stream_pos
+		var start_stream_pos = sp
 		var start_pos = _pos
 		var start_line = _line
+		var string = _file.string
+		var string_len = string.length
 
 		var accept_state = -1
 		var accept_token = -1
@@ -89,9 +92,12 @@ $ end foreach
 		var accept_line = -1
 
 		loop
-			var c = get_char
+			if sp >= string_len then
+				dfa_state = -1
+			else
+				var c = string[sp].ascii
+				sp += 1
 
-			if c != -1 then
 				var cr = _cr
 				var line = _line
 				var pos = _pos
@@ -143,8 +149,6 @@ $ end foreach
 				_cr = cr
 				_line = line
 				_pos = pos
-			else
-				dfa_state = -1
 			end
 
 			if dfa_state >= 0 then
@@ -152,7 +156,7 @@ $ end foreach
 				if tok != -1 then
 					accept_state = dfa_state
 					accept_token = tok
-					accept_length = _stream_pos - start_stream_pos
+					accept_length = sp - start_stream_pos
 					accept_pos = _pos
 					accept_line = _line
 				end
@@ -161,7 +165,7 @@ $ end foreach
 					var location = new Location(_file, start_line + 1, accept_line + 1, start_pos + 1, accept_pos)
 					_pos = accept_pos
 					_line = accept_line
-					push_back(_stream_pos - start_stream_pos - accept_length)
+					_stream_pos = start_stream_pos + accept_length
 $ foreach {//token}
 					if accept_token == ${position()-1} then
 $    if {count(transition[@from!=@to])!=0}
@@ -174,7 +178,7 @@ $        end
 $    end if
 $    if {@parser_index}
 $        if {not(@text)}
-						var token_text = _file.string.substring(start_stream_pos, accept_length)
+						var token_text = string.substring(start_stream_pos, accept_length)
 						return new @ename.init_tk(token_text, location)
 $        else
 						return new @ename.init_tk(location)
@@ -185,9 +189,10 @@ $    end
 					end
 $ end foreach
 				else
+					_stream_pos = sp
 					var location = new Location(_file, start_line + 1, start_line + 1, start_pos + 1, start_pos + 1)
-					if _stream_pos > start_stream_pos then
-						var text = _file.string.substring(start_stream_pos, _stream_pos)
+					if sp > start_stream_pos then
+						var text = string.substring(start_stream_pos, sp-start_stream_pos)
 						var token = new PError.init_error("Syntax error: unknown token {text}.", location)
 						return token
 					else
