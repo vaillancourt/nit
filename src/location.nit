@@ -23,7 +23,14 @@ class SourceFile
 	do
 		filename = f
 		string = s.read_all
+		line_starts[0] = 0
 	end
+
+	# Position of each line start
+	var line_starts: Array[Int] = new Array[Int]
+
+	# Position of each line end (do not include the eol characters)
+	var line_ends: Array[Int] = new Array[Int]
 end
 
 class Location

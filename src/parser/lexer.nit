@@ -1272,6 +1272,7 @@ class Lexer
 		loop
 			if sp >= string_len then
 				dfa_state = -1
+				_file.line_ends[_line] = string_len - 1
 			else
 				var c = string[sp].ascii
 				sp += 1
@@ -1282,14 +1283,19 @@ class Lexer
 				if c == 10 then
 					if cr then
 						cr = false
+					        _file.line_starts[line] = sp
 					else
+						_file.line_ends[line] = sp - 2
 						line = line + 1
 						pos = 0
+					        _file.line_starts[line] = sp
 					end
 				else if c == 13 then
+					_file.line_ends[line] = sp - 2
 					line = line + 1
 					pos = 0
 					cr = true
+					_file.line_starts[line] = sp
 				else
 					pos = pos + 1
 					cr = false
