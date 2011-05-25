@@ -106,6 +106,19 @@ class MMDirectory
 	end
 end
 
+# A module name is used to import modules
+class MMModuleName
+	
+	# Tells if the name is specified from root directory
+	var is_from_root: Bool
+
+	# Path from the start to the module name, excluding the name
+	var path: List[Symbol]
+	
+	# End name of the path
+	var name: Symbol
+end
+
 # A module is a Nit file
 class MMModule
 	# Global context
