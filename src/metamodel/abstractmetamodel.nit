@@ -150,7 +150,7 @@ class MMModuleName
 	fun to_qualified_name: String
 	do
 		var quad : String = ""
-		if is_from_root != null then quad = "::"
+		if is_from_root then quad = "::"
 		
 		if path.length == 0 then
 			return "{quad}{name}"
