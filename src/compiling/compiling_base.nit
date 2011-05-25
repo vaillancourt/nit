@@ -289,20 +289,7 @@ redef class MMModule
 	# The mangled name of the module
 	fun cname: String
 	do
-		var cname = _cname_cache
-		if cname == null then
-			var l = new List[String]
-			var m: nullable MMModule = self
-			while m != null do
-				l.unshift(cmangle(m.name))
-				var d: nullable MMDirectory = m.directory
-				while d != null and d.owner == m do d = d.parent
-				if d == null then m = null else m = d.owner
-			end
-			cname = l.to_a.join("___")
-			_cname_cache = cname
-		end
-		return cname
+		return cmangled_name.to_s
 	end
 end
 

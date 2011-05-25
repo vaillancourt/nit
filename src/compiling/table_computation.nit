@@ -144,7 +144,7 @@ redef class Program
 	do
 		tc.info("Building tables",1)
 		for m in main_module.mhe.greaters_and_self do
-			tc.info("Building tables for module: {m.name}",2)
+			tc.info("Building tables for module: {m.cmangled_name}",2)
 			m.local_analysis
 		end
 

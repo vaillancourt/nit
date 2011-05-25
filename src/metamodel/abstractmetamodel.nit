@@ -126,6 +126,9 @@ class MMModule
 
 	# Short name of the module
 	readable var _name: Symbol
+	
+	# Full c var 'unique' friendly name
+	readable var _cmangled_name: Symbol
 
 	# Full name of the module
 	readable var _full_name: Symbol
@@ -172,6 +175,7 @@ class MMModule
 		_directory = dir
 		_context = context
 		_full_name = dir.full_name_for(name)
+		_cmangled_name = name
 		_location = loc
 	end
 
