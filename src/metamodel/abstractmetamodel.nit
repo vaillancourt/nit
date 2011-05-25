@@ -143,6 +143,53 @@ class MMModuleName
 	
 	# End name of the path
 	var name: Symbol
+
+	# Transforms back the name to a qualified module definition
+	# ex.: ::first_dir_from_root::second_dir_from_root::module_name
+	# or first_dir::second_dir::module_name
+	fun to_qualified_name: String
+	do
+		var quad : String = ""
+		if is_from_root != null then quad = "::"
+		
+		if path.length == 0 then
+			return "{quad}{name}"
+		else
+			var acc = ""
+			for path_item in path 
+			do
+				acc += path_item.to_s + "::"
+			end
+			return "{quad}{acc}{name}"
+		end
+	end
+	
+	fun to_full_path: String
+	do
+		if path.length == 0 then
+			return name.to_s
+		else
+			var acc = ""
+			for path_item in path 
+			do
+				acc += path_item.to_s + "/"
+			end
+			return "{acc}{name}"
+		end
+	end
+
+	fun to_folder_path: String
+	do
+		var acc = ""
+		for path_item in path 
+		do
+			acc += path_item.to_s + "/"
+		end
+		return "{acc}"
+	end
+
+	
+	redef fun to_s do return to_qualified_name
 end
 
 # A module is a Nit file
