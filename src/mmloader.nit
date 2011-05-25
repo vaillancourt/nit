@@ -117,6 +117,9 @@ class ToolContext
 	# Paths where to locate modules files
 	readable var _paths: Array[String] = new Array[String]
 
+	# Root directory for other sources (-I, enviroment variables, etc)
+	readable var _additional_root_source_directories: List[MMDirectory] = new List[MMDirectory]
+
 	# List of module loaders
 	var _loaders: Array[ModuleLoader] = new Array[ModuleLoader]
 	
@@ -160,6 +163,15 @@ class ToolContext
 	do
 		super
 		option_context.add_option(opt_warn, opt_stop_on_first_error, opt_path, opt_log, opt_log_dir, opt_only_parse, opt_only_metamodel, opt_help, opt_version, opt_verbose)
+	end
+	
+	# Creates a MMDirectory for each root directories specified in paths
+	fun prepare_module_fetching
+	do
+		for p in paths do
+			var dir = new MMDirectory(p.to_symbol, p, null)
+			_additional_root_source_directories.push(dir)
+		end
 	end
 
 	# Parse and process the options given on the command line

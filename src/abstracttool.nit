@@ -61,6 +61,10 @@ class AbstractCompiler
 		var rest = option_context.rest
 		var to_do = new Array[MMModule]
 		info("Syntax analysis",1)
+
+		# load extra root directories
+		prepare_module_fetching()
+
 		for i in [0..rest.length[ do
 			var mod = get_module_from_filename(rest[i])
 			to_do.add(mod)
