@@ -462,6 +462,29 @@ redef class AModuledecl
 	end
 end
 
+redef class AModuleName
+
+	private var cached_mmmname: nullable MMModuleName = null
+
+	fun mm_module_name: MMModuleName
+	do
+		if cached_mmmname != null then return cached_mmmname.as(not null)
+		
+		var quad = n_quad != null
+		var name = n_id.text.to_symbol
+		var path = new List[Symbol]
+		
+		for path_item in n_path
+		do
+			path.push(path_item.text.to_symbol)
+		end
+		
+		cached_mmmname = new MMModuleName(quad, path, name)
+		
+		return cached_mmmname.as(not null)
+	end
+end
+
 redef class AImport
 	# Imported module name (or null)
 	fun module_name: nullable Symbol is abstract
