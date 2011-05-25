@@ -81,6 +81,9 @@ class MMDirectory
 	# null if none
 	readable var _parent: nullable MMDirectory
 
+	# Children directories
+	readable var _children: Map[Symbol, MMDirectory] = new HashMap[Symbol, MMDirectory]
+
 	# The module that introduces the directory if any
 	readable writable var _owner: nullable MMModule = null
 
@@ -94,12 +97,35 @@ class MMDirectory
 		_modules[mod.name] = mod
 	end
 
+	# Register a new children Directory
+	private fun add_child_directory(directory: MMDirectory)
+	do
+		assert not _children.has_key(directory.name)
+		_children[directory.name] = directory
+	end
+
 	init(name: Symbol, path: String, parent: nullable MMDirectory) do
 		_name = name
 		_path = path
 		_parent = parent
+		if parent != null then
+			parent.add_child_directory(self)
+		end
 	end
 
+	# Searches up the hierarchy to find the root directory (the one who has 
+	# no parent. 
+	fun get_root_dir: nullable MMDirectory
+	do
+		if parent == null then return null
+
+		var ret = parent
+		
+		while ret.parent != null do ret = ret.parent
+		
+		return ret
+	end
+	
 	# The fullname of a a potentiel module in the directory
 	fun full_name_for(module_name: Symbol): Symbol do
 		return "{name}/{module_name}".to_symbol
