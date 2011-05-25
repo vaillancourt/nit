@@ -60,7 +60,7 @@ class SrcModuleLoader
 	redef fun process_metamodel(context, mod)
 	do
 		mod.process_supermodules(context)
-		context.info("Syntax analysis for module: {mod.name}", 2)
+		context.info("Syntax analysis for module: {mod.cmangled_name}", 2)
 		mod.process_syntax(context)
 	end
 
