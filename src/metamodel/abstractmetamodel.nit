@@ -130,6 +130,57 @@ class MMDirectory
 	fun full_name_for(module_name: Symbol): Symbol do
 		return "{name}/{module_name}".to_symbol
 	end
+	
+	# Make sure the path provided in parameter exists within current 
+	# diretory, and returns the last directory created.
+	fun make_path_and_get_last_dir(module_path: List[Symbol]): MMDirectory
+	do
+		var parent: nullable MMDirectory
+		var current: nullable MMDirectory
+		var current_path: String
+		
+		parent = self
+		current_path = path
+		for i in [0..module_path.length[
+		do
+			current_path += "{module_path[i].to_s}/"
+			if parent.children.has_key(module_path[i]) then
+				# directory already exists, check further
+				parent = parent.children[module_path[i]]
+			else
+				# directory does not exist, create it, and go further
+				current = new MMDirectory(module_path[i], current_path, parent)
+				parent = current
+			end
+		end
+		
+		return parent
+	end
+	
+	# Search in the hierarchy of which this directory is root and return the 
+	# specified module if it exists. Returns null if the module is not 
+	# found. 
+	fun get_module_if_loaded(name: MMModuleName): nullable MMModule
+	do
+		
+		if name.path.length == 0 then
+			# look in current directory
+			if _modules.has_key(name.name) then
+				return _modules[name.name]
+			end
+		else
+			# search directory hierarchy
+			if _children.has_key(name.path[0]) then
+				var new_name = new MMModuleName(false, new List[Symbol].from(name.path), name.name)
+				new_name.path.remove_at(0)
+				return _children[name.path[0]].get_module_if_loaded(new_name)
+			end
+		end
+		
+		# module not loaded
+		return null
+		
+	end
 end
 
 # A module name is used to import modules
