@@ -428,14 +428,17 @@ redef class AModule
 		# Import super-modules
 		var supers = new Array[MMModule]
 		var no_import: nullable AImport = null
-		for i in n_imports do
-			var n = i.module_name
-			if n != null then
-				var m = tc.get_module(n, mod)
-				supers.add(m)
-				mod.add_super_module(m, i.visibility_level)
+		for current_import in n_imports do
+			if current_import.module_name != null then
+				if current_import isa AStdImport then
+					var m = tc.get_module(current_import.module_name.as(not null), mod)
+					supers.add(m)
+					mod.add_super_module(m, current_import.visibility_level)
+				else
+					tc.error(current_import.location, "Error: import is not a std import")
+				end
 			else
-				no_import = i
+				no_import = current_import
 			end
 		end
 		if no_import != null then
@@ -443,8 +446,8 @@ redef class AModule
 				tc.error(no_import.location, "Error: Top modules cannot import other modules.")
 			end
 		else if supers.is_empty then
-			var stdname = once "standard".to_symbol
-			var m = tc.get_module(stdname, mod)
+			var mm_module_name = new MMModuleName(false, new List[Symbol], "standard".to_symbol)
+			var m = tc.get_module(mm_module_name, mod)
 			supers.add(m)
 			mod.add_super_module(m, 1)
 		end
@@ -487,7 +490,7 @@ end
 
 redef class AImport
 	# Imported module name (or null)
-	fun module_name: nullable Symbol is abstract
+	fun module_name: nullable MMModuleName is abstract
 
 	# Visibility level (intrude/public/private)
 	fun visibility_level: Int is abstract
@@ -495,7 +498,7 @@ end
 redef class AStdImport
 	redef fun module_name
 	do
-		return n_name.n_id.to_symbol
+		return n_name.mm_module_name
 	end
 	redef fun visibility_level
 	do

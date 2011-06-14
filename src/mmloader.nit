@@ -117,6 +117,9 @@ class ToolContext
 	# Paths where to locate modules files
 	readable var _paths: Array[String] = new Array[String]
 
+	# Root source directory
+	readable var _root_source_directory: nullable MMDirectory = null
+	
 	# Root directory for other sources (-I, enviroment variables, etc)
 	readable var _additional_root_source_directories: List[MMDirectory] = new List[MMDirectory]
 
@@ -210,41 +213,95 @@ class ToolContext
 	# Load and process a module in a directory (or a parent directory).
 	# If the module is already loaded, just return it without further processing.
 	# If no module is found, just return null without complaining.
-	private fun try_to_load(module_name: Symbol, dir: MMDirectory): nullable MMModule
+	# Search locally
+	private fun try_to_load(module_name: MMModuleName, dir: MMDirectory): nullable MMModule
 	do
-		# Look in the module directory
-		for m in dir.modules do
-			if m.name == module_name then return m
-		end
+		print "in  try_to_load module_name {module_name} dir {dir}"
 
-		# print "try to load {module_name} in {dir.name} {_loaders.length}"
-
+		var mod : nullable MMModule
+		
+		# get module if loaded
+		mod = dir.get_module_if_loaded(module_name)
+		if mod != null then return mod
+		# check if name is a module folder
+#		var module_folder_name = module_name.get_as_module_foler
+#		mod = dir.get_module_if_loaded(module_folder_name)
+#		if mod != null then return mod
+		
+		
+		var module_found_already = false
+		var mod2 : nullable MMModule
+		mod2 = null.as(nullable MMModule)
+		var full_name = "".to_symbol
+		
 		for l in _loaders do
-			var dir2 = l.try_to_load_dir(module_name, dir)
+			
+			var is_module_handled_with_usual_name = false
+			var dir2 = l.try_to_load_dir_with_full_path(module_name, dir)
+			
 			if dir2 != null then
-				var m = try_to_load(module_name, dir2)
-				if m != null then
-					dir2.owner = m
-					dir.add_module(m)
-					return m
+				if l.can_handle(module_name.name, dir2) then
+					# file with usual name exists
+					is_module_handled_with_usual_name = true
+					
+					full_name = dir2.full_name_for(module_name.name)
+					if module_found_already == true then
+						fatal_error(null, "Error: module {full_name} can be loaded from many loaders")
+						abort
+					end
+					if _processing_modules.has(full_name) then
+						# FIXME: Generate better error
+						fatal_error(null, "Error: Dependency loop for module {full_name}")
+					end
+					_processing_modules.add(full_name)
+					print "PROCESS {full_name}"
+					mod2 = l.load_and_process_module(self, module_name.name, dir2)
+					print "-PROCESS {full_name}"
+					_processing_modules.remove(full_name)
+					
+					dir2.add_module(mod2)
+					module_found_already = true
 				end
 			end
+			
+			# try to interpret a mm_module_name.name as a folder 
+			# containing a nit module with same name
+			
+#			var new_module_name = module_name.get_as_module_foler
+			
+#			var dir3 = l.try_to_load_dir_with_full_path(new_module_name, dir)
+			
+#			if dir3 != null then
+#				if is_module_handled_with_usual_name then
+#					fatal_error(null, "Error: module {full_name} exists as a module unit and a module folder.")
+#					abort
+#				end
 
-			if l.can_handle(module_name, dir) then
-				var full_name = dir.full_name_for(module_name)
-				if _processing_modules.has(full_name) then
-					# FIXME: Generate better error
-					fatal_error(null, "Error: Dependency loop for module {full_name}")
-				end
-				_processing_modules.add(full_name)
-				var m = l.load_and_process_module(self, module_name, dir)
-				_processing_modules.remove(full_name)
-				#if m != null then print "loaded {m.name} in {m.directory.name} -> {m.full_name} ({m.full_name.object_id.to_hex})"
-				dir.add_module(m)
-				return m
-			end
+#				if l.can_handle(module_name.name, dir3) then
+
+#					full_name = dir3.full_name_for(module_name.name)
+#					if module_found_already == true then
+#						fatal_error(null, "Error: module {full_name} can be loaded from many loaders")
+#						abort
+#					end
+#					if _processing_modules.has(full_name) then
+#						# FIXME: Generate better error
+#						fatal_error(null, "Error: Dependency loop for module {full_name}")
+#					end
+#					_processing_modules.add(full_name)
+#					print "PROCESS {full_name}"
+#					mod2 = l.load_and_process_module(self, module_name.name, dir3)
+#					print "-PROCESS {full_name}"
+#					_processing_modules.remove(full_name)
+					
+#					dir3.add_module(mod2)
+#					module_found_already = true
+#				end
+#			end
 		end
-		return null
+		
+		print "out try_to_load module_name {module_name} dir {dir}"
+		return mod2 
 	end
 
 	# List of module currently processed.
@@ -256,28 +313,23 @@ class ToolContext
 	# Beware, the files are automatically considered root of their directory.
 	fun get_module_from_filename(filename: String): MMModule
 	do
+		print "in  get_module_from_filename filename {filename}"
+		
 		var path = filename.dirname
 		var module_name = filename.basename(".nit").to_symbol
 
+		var mm_module_name = new MMModuleName(true, new List[Symbol], module_name)
+
 		var dir = directory_for(path)
+		
+		_root_source_directory = dir
+		
+		# look for it in the path directory entered
+		var m = try_to_load(mm_module_name, dir)
+		
 
-		if module_name.to_s == filename then
-			# It's just a modulename
-			# look for it in the path directory "."
-			var m = try_to_load(module_name, dir)
-			if m != null then return m
+		print "out get_module_from_filename filename {filename}"
 
-			# Else look for it in the path
-			return get_module(module_name, null)
-		end
-
-		if not filename.file_exists then
-			fatal_error(null, "Error: File {filename} not found.")
-			abort
-		end
-
-		# Try to load the module where mentionned
-		var m = try_to_load(module_name, dir)
 		if m != null then return m
 
 		fatal_error(null, "Error: {filename} is not a NIT source module.")
@@ -286,24 +338,118 @@ class ToolContext
 
 	# Locate, load and analysis a module (and its supermodules).
 	# If the module is already loaded, just return it without further processing.
-	fun get_module(module_name: Symbol, from: nullable MMModule): MMModule
+	fun get_module(module_name: MMModuleName, from: nullable MMModule): MMModule
 	do
-		if from != null then
-			var dir: nullable MMDirectory = from.directory
-			while dir != null do
-				var m = try_to_load(module_name, dir)
-				if m != null then return m
-				dir = dir.parent
+		if from == null then print "in  get_module module_name {module_name} from null"
+		if from != null then print "in  get_module module_name {module_name} from {from}"
+
+		var module_found_in_paths = new List[Couple[MMDirectory, String]]
+		var mod_local: nullable MMModule = null
+		var mod_in_other_dir: nullable MMModule = null
+		var mod: nullable MMModule = null
+		var root_dir: nullable MMDirectory = null
+		var searched_dir = new HashSet[String]
+		
+		var module_name_as_folder = module_name.get_as_module_foler
+		
+		# or is it from other directories
+		for dir in _additional_root_source_directories do
+			if not searched_dir.has("{dir.path}{module_name.to_folder_path}") then
+				mod_in_other_dir = try_to_load(module_name, dir)
+				searched_dir.add("{dir.path}{module_name.to_folder_path}")
+				if mod_in_other_dir != null then
+					module_found_in_paths.push(new Couple[MMDirectory, String](dir, "Additional"))
+					mod = mod_in_other_dir
+				end
 			end
 		end
-
-		for p in paths do
-			var m = try_to_load(module_name, directory_for(p))
-			if m != null then return m
+		
+		# Is the module a folder?
+		for dir in _additional_root_source_directories do
+			if not searched_dir.has("{dir.path}{module_name_as_folder.to_folder_path}") then
+				mod_in_other_dir = try_to_load(module_name_as_folder, dir)
+				searched_dir.add("{dir.path}{module_name_as_folder.to_folder_path}")
+				if mod_in_other_dir != null then
+					module_found_in_paths.push(new Couple[MMDirectory, String](dir, "Additional-module-folder"))
+					mod = mod_in_other_dir
+				end
+			end
 		end
-		# FIXME: Generate better error
-		fatal_error(null, "Error: No ressource found for module {module_name}.")
-		abort
+		
+		if from != null then root_dir = from.directory.get_root_dir
+		
+		# not from root but has a dir -> search local up to roots
+		# is_from_root -> search from roots only
+		# has no from dir -> search from roots only
+		
+		if not module_name.is_from_root and from != null then
+			# Look from local and local parents
+
+			var search_dir = from.directory.as(nullable MMDirectory)
+			
+			while search_dir != null 
+			do
+				if not searched_dir.has("{search_dir.path}{module_name.to_folder_path}") then
+					mod_local = try_to_load(module_name, search_dir)
+					searched_dir.add("{search_dir.path}{module_name.to_folder_path}")
+					if mod_local != null then
+						module_found_in_paths.push(new Couple[MMDirectory, String](search_dir, "Local"))
+						mod = mod_local
+					end
+				end 
+				
+				# Is the module name a folder?
+				if not searched_dir.has("{search_dir.path}{module_name_as_folder.to_folder_path}") then
+					mod_local = try_to_load(module_name_as_folder, search_dir)
+					searched_dir.add("{search_dir.path}{module_name_as_folder.to_folder_path}")
+					if mod_local != null then
+						module_found_in_paths.push(new Couple[MMDirectory, String](search_dir, "Local-module-folder"))
+						mod = mod_local
+					end
+				end 
+				search_dir = search_dir.parent
+			end
+		end
+			
+		
+		# maybe it's from main root source
+#		if not searched_dir.has(_root_source_directory.as(not null)) then
+#			var mod_from_root = try_to_load(module_name, _root_source_directory.as(not null))
+#			
+#			searched_dir.add(_root_source_directory.as(not null))
+#			
+#			if mod_from_root != null then
+#				module_found_in_paths.push(new Couple[MMDirectory, String](_root_source_directory.as(not null), "Root"))
+#				mod = mod_from_root
+#			end
+#		end
+		
+		
+		
+		# Check for duplicate
+		
+		if module_found_in_paths.length > 1 then
+			# FIXME: Generate better error
+			var out = ""
+			
+			for couple in module_found_in_paths
+			do
+				out += "\n\t" + couple.first.path + "->" + couple.second #.as(not null)
+			end
+			
+			if from != null then fatal_error(null, "Error: Ambiguous module import '{module_name}' from {from.full_name}. Found in {out}")
+			if from == null then fatal_error(null, "Error: Ambiguous module import '{module_name}' from null. Found in {out}")
+			abort
+		else if module_found_in_paths.length == 0 then
+			# FIXME: Generate better error
+			if from != null then fatal_error(null, "Error: No ressource found for module '{module_name}' imported from '{from.location}'.")
+			if from == null then fatal_error(null, "Error: No ressource found for module '{module_name}'")
+			abort
+		end
+		
+#		if from == null then print "out get_module module_name {module_name} from null"
+#		if from != null then print "out get_module module_name {module_name} from {from}"
+		return mod.as(not null)
 	end
 
 	# Return the module directory associated with a given path
@@ -333,19 +479,59 @@ class ModuleLoader
 	# Try to load a new module directory
 	fun try_to_load_dir(dirname: Symbol, parent_dir: MMDirectory): nullable MMDirectory
 	do
-		var fname = "{parent_dir.path}/{dirname}/"
-		if not fname.file_exists then return null
+#		print "in  try_to_load_dir dirname {dirname} parent_dir {parent_dir}"
+		var fname = "{parent_dir.path}{dirname}/"
+		if not fname.file_exists then 
+#			print "loc try_to_load_dir fname.file_exists == false"
+#			print "out try_to_load_dir dirname {dirname} parent_dir {parent_dir}"
+#			print "loc try_to_load_dir fname {fname}: file exists : no"
+			return null
+		end
 
+#		print "loc try_to_load_dir fname {fname}: file exists : yes"
 		var dir = new MMDirectory(parent_dir.full_name_for(dirname), fname, parent_dir)
+
+#		print "out try_to_load_dir dirname {dirname} parent_dir {parent_dir}"
 		return dir
+	end
+
+	# Try to load a new module directory full path
+	fun try_to_load_dir_with_full_path(module_name: MMModuleName, parent_dir: MMDirectory): nullable MMDirectory
+	do
+#		print "in  try_to_load_dir_with_full_path module_name {module_name} parent_dir {parent_dir}"
+
+		var fname = "{parent_dir.path}{module_name.to_folder_path}"
+		
+		if not fname.file_exists then 
+			print "loc try_to_load_dir_with_full_path fname {fname}: file exists : no"
+#			print "loc try_to_load_dir_with_full_path fname.file_exist == false"
+#			print "out try_to_load_dir_with_full_path module_name {module_name} parent_dir {parent_dir}"
+			return null
+		end
+
+		print "loc try_to_load_dir_with_full_path fname {fname}: file exists : yes"
+#		print "out try_to_load_dir_with_full_path module_name {module_name} parent_dir {parent_dir}"
+		return parent_dir.make_path_and_get_last_dir(module_name.path)
 	end
 
 	# Can the loadhandler load a given module?
 	# Return the file found
 	fun can_handle(module_name: Symbol, dir: MMDirectory): Bool
 	do
-		var fname = "{dir.path}/{module_name}.{file_type}"
-		if fname.file_exists then return true
+#		print "in  can_handle module_name {module_name} dir {dir}"
+
+		# dir.path is assumed to be ended by a '/' character
+		var fname = "{dir.path}{module_name}.{file_type}"
+#		print "loc can_handle fname {fname}"
+
+		if fname.file_exists then
+#			print "out can_handle module_name {module_name} dir {dir}: yes"
+			print "loc can_handle fname {fname}: yes"
+			return true
+		end
+
+		print "loc can_handle fname {fname}: no"
+#		print "out can_handle module_name {module_name} dir {dir}: no"
 		return false
 	end
 
@@ -353,15 +539,24 @@ class ModuleLoader
 	# filename is the result of can_handle
 	fun load_and_process_module(context: ToolContext, module_name: Symbol, dir: MMDirectory): MODULE
 	do
-		var filename = "{dir.path}/{module_name}.{file_type}"
+#		print "in  load_and_process_module module_name {module_name} dir {dir}"
+
+		# dir.path is assumed to be ended by a '/' character
+		var filename = "{dir.path}{module_name}.{file_type}"
+		print "loc load_and_process_module filename {filename}"
+		
 		var m = load_module(context, module_name, dir, filename)
 		if not context.opt_only_parse.value then process_metamodel(context, m)
+
+		print "out load_and_process_module module_name {module_name} dir {dir}"
 		return m
 	end
 
 	# Load an parse the module
 	private fun load_module(context: ToolContext, module_name: Symbol, dir: MMDirectory, filename: String): MODULE
 	do
+		print "in  load_module module_name {module_name} dir {dir} filename {filename}"
+	
 		var file: IFStream
 		if filename == "-" then
 			file = stdin
@@ -374,6 +569,7 @@ class ModuleLoader
 		end
 		var m = parse_file(context, file, filename, module_name, dir)
 		if file != stdin then file.close
+		print "out load_module module_name {module_name} dir {dir} filename {filename}"
 		return m
 	end
 

@@ -20,6 +20,7 @@ package abstractmetamodel
 
 import partial_order
 import location
+import utils
 
 # The main singleton which knows everything
 class MMContext
@@ -85,7 +86,7 @@ class MMDirectory
 	readable var _children: Map[Symbol, MMDirectory] = new HashMap[Symbol, MMDirectory]
 
 	# The module that introduces the directory if any
-	readable writable var _owner: nullable MMModule = null
+	# readable writable var _owner: nullable MMModule = null
 
 	# Known modules in the directory
 	readable var _modules: Map[Symbol, MMModule] = new HashMap[Symbol, MMModule]
@@ -93,6 +94,7 @@ class MMDirectory
 	# Register a new module
 	fun add_module(mod: MMModule)
 	do
+		if _modules.has_key(mod.name) then print "Directory {self} has already module {mod}"
 		assert not _modules.has_key(mod.name)
 		_modules[mod.name] = mod
 	end
@@ -105,8 +107,14 @@ class MMDirectory
 	end
 
 	init(name: Symbol, path: String, parent: nullable MMDirectory) do
+		if parent != null then print "in MMDirectory.init(name: {name}, path: {path}, parent: {parent})"
+		if parent == null then print "in MMDirectory.init(name: {name}, path: {path}, parent: null)"
 		_name = name
-		_path = path
+		if path[path.length-1] != '/' then
+			_path = path + "/"
+		else
+			_path = path
+		end
 		_parent = parent
 		if parent != null then
 			parent.add_child_directory(self)
@@ -126,11 +134,17 @@ class MMDirectory
 		return ret
 	end
 	
-	# The fullname of a a potentiel module in the directory
-	fun full_name_for(module_name: Symbol): Symbol do
-		return "{name}/{module_name}".to_symbol
+	# The path of a a potentiel module in the directory
+	fun full_path_for(module_name: Symbol): Symbol do
+		return "{path}{module_name}".to_symbol
 	end
 	
+	# The fullname of a a potentiel module in the directory
+	fun full_name_for(module_name: Symbol): Symbol do
+		#print "full_name_for::{path}{module_name}"
+		return "{path}{module_name}".to_symbol
+	end
+
 	# Make sure the path provided in parameter exists within current 
 	# diretory, and returns the last directory created.
 	fun make_path_and_get_last_dir(module_path: List[Symbol]): MMDirectory
@@ -180,6 +194,11 @@ class MMDirectory
 		# module not loaded
 		return null
 		
+	end
+	
+	redef fun to_s
+	do
+		return path
 	end
 end
 
@@ -239,6 +258,12 @@ class MMModuleName
 		return "{acc}"
 	end
 
+	fun get_as_module_foler: MMModuleName
+	do
+		var folder_list = new List[Symbol].from(path)
+		folder_list.push(name)
+		return new MMModuleName(is_from_root, folder_list, name)
+	end
 	
 	redef fun to_s do return to_qualified_name
 end
@@ -299,7 +324,8 @@ class MMModule
 		_directory = dir
 		_context = context
 		_full_name = dir.full_name_for(name)
-		_cmangled_name = name
+		#_cmangled_name = name
+		_cmangled_name = cmangle(dir.full_name_for(name)).to_symbol
 		_location = loc
 	end
 
@@ -371,7 +397,7 @@ class MMModule
 		return _global_class_by_name[n]
 	end
 
-	redef fun to_s do return name.to_s
+	redef fun to_s do return _full_name.to_s
 
 	# Assign super_classes for a local class
 	fun set_supers_class(c: MMLocalClass, supers: Array[MMLocalClass])
